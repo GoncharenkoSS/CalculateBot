@@ -2,7 +2,9 @@ package Calculon88.bot.Model;
 
 import jakarta.persistence.*;
 
+import java.util.Date;
 import java.util.List;
+
 
 @Entity
 @Table(name = "userTG")

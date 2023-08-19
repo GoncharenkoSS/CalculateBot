@@ -17,13 +17,26 @@ import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import org.telegram.telegrambots.updatesreceivers.DefaultBotSession;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Date;
 import java.util.List;
 
 @Controller
 public class Bot extends TelegramLongPollingBot {
 
+    //Здесь можно добавить ID администратора.
+    List<Long> administrators = List.of(583954324L);
+
     private final UserRepository userRepository;
     private final ValuesRepository valuesRepository;
+
+    private UserTG user = new UserTG();
+    private Values values;
+    boolean session = false;
+    int count = 0;
+    String balance, risk, open, currency, exception = "";
+    double bet = 0;
+    Date lastDate;
 
     public Bot(UserRepository userRepository, ValuesRepository valuesRepository) {
         this.userRepository = userRepository;
@@ -32,7 +45,9 @@ public class Bot extends TelegramLongPollingBot {
 
     @PostConstruct
     public void switchboard() throws TelegramApiException {
+
         TelegramBotsApi telegramBotsApi = new TelegramBotsApi(DefaultBotSession.class);
+
         try {
             telegramBotsApi.registerBot(new Bot(userRepository, valuesRepository));
         } catch (TelegramApiException e) {
@@ -50,22 +65,15 @@ public class Bot extends TelegramLongPollingBot {
         return "6566040320:AAFFYh5muuu95rSz9Rg1O1yx7ebVCieGKHQ";
     }
 
-    UserTG user = new UserTG();
-    Values values;
-    boolean session = false;
-    int count = 0;
-    String balance, risk, open, currency, exception = "";
-    double bet = 0;
-
     public void onUpdateReceived(Update update) {
         Message message = update.getMessage();
-        if(userRepository.findByIdTG(message.getFrom().getId()).isEmpty()) {
+        if (userRepository.findByIdTG(message.getFrom().getId()).isEmpty()) {
             user.setIdTG(message.getFrom().getId());
             user.setFirst_name(message.getFrom().getFirstName());
             user.setLast_name(message.getFrom().getLastName());
             user.setUname(message.getFrom().getUserName());
-            user.setFirstTime(message.getConnectedWebsite());
-    //        user.setLastTime(message.getForwardDate().toString());
+            Date firstDate = new Date();
+            user.setFirstTime(String.valueOf(firstDate));
             userRepository.save(user);
         }
 
@@ -118,6 +126,31 @@ public class Bot extends TelegramLongPollingBot {
                     currency = "Биткоин";
                     values.setCurrency("Биткоин");
                     System.out.println(message.getText());
+                    break;
+                case "/get_last_req_user":
+                    List<String> strUser = new ArrayList<>();
+                    if(administrators.contains(message.getFrom().getId())) {
+                        for (UserTG user : userRepository.findLast10userTG()) {
+                            strUser.add("Имя: " + user.getFirst_name() + " ID: " + user.getIdTG());
+                        }
+                        calculation(message, strUser.toString());
+                    }else calculation(message, " У вас нет доступа к данному функционалу");
+                    strUser.clear();
+                    break;
+                case "/get_last_orders":
+                    List<String> strValues = new ArrayList<>();
+                    if(administrators.contains(message.getFrom().getId())) {
+                        for (Values val : valuesRepository.findLast5values()) {
+                            strValues.add("Имя: " + val.getOwner().getFirst_name() + "\n" +
+                                    " Валюта: " + val.getCurrency() + "\n" +
+                                    " Баланс: " + val.getBalance() + "\n" +
+                                    " Риск: " + val.getRisk() + "\n" +
+                                    " Вхождение: " + val.getOpen() + "\n" +
+                                    " Ставка: " + val.getBet() + "\n" + " " + "\n");
+                        }
+                        calculation(message, strValues.toString());
+                    }else calculation(message, " У вас нет доступа к данному функционалу");
+                    strValues.clear();
                     break;
                 default:
                     choiceStart(message, "Я Вас не понял! Отправьте /start чтобы начать работать с ботом");
@@ -189,6 +222,9 @@ public class Bot extends TelegramLongPollingBot {
                     exception = "";
                     values.setOwner(user);
                     valuesRepository.save(values);
+                    Date lastDate=new Date();
+                    user.setLastTime(String.valueOf(lastDate));
+                    userRepository.save(user);
                     break;
             }
         }
